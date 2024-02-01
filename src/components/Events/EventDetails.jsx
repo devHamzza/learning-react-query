@@ -4,25 +4,31 @@ import Header from "../Header.jsx";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { deleteEvent, fetchEvent, queryClient } from "../utils/http.js";
 import ErrorBlock from "../UI/ErrorBlock.jsx";
+import LoadingIndicator from "../UI/LoadingIndicator.jsx";
 
 export default function EventDetails() {
   const navigate = useNavigate();
   const params = useParams();
-  const { data, isPending, isError } = useQuery({
-    queryKey: ["events-deatils"],
+  const {
+    data: event,
+    isPending,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["events", { eventId: params.id }],
     queryFn: ({ signal }) => fetchEvent({ id: params.id, signal }),
   });
 
-  const { mutate } = useMutation({
+  const { mutate, isPending: deleting } = useMutation({
     // mutationKey: ["delete-event"],
-    mutationFn: () => deleteEvent({ id: params.id }),
+    mutationFn: deleteEvent,
     onSuccess: () => {
       navigate("/events");
       queryClient.invalidateQueries({ queryKey: ["events"] });
     },
   });
 
-  const dateString = data?.date;
+  const dateString = event?.date;
   const dateObject = new Date(dateString);
   const formattedDateString = dateObject.toDateString();
 
@@ -35,33 +41,39 @@ export default function EventDetails() {
         </Link>
       </Header>
       {isPending && (
-        <p style={{ textAlign: "center" }}>Please Wait! Loading...</p>
+        <div className="center" id="event-details-content">
+          <LoadingIndicator />
+        </div>
       )}
       {isError && (
-        <ErrorBlock
-          title={"Request Failed"}
-          message={"Could not fetch event's deatils"}
-        />
+        <div className="center" id="event-details-content">
+          <ErrorBlock
+            title={"Request Failed"}
+            message={error.info?.message || "Could not fetch event's deatils"}
+          />
+        </div>
       )}
-      {data && !isError && (
+      {event && !isError && (
         <article id="event-details">
           <header>
-            <h1>EVENT TITLE</h1>
+            <h1>{event.title}</h1>
             <nav>
-              <button onClick={mutate}>Delete</button>
+              <button onClick={() => mutate({ id: params.id })}>
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
               <Link to="edit">Edit</Link>
             </nav>
           </header>
           <div id="event-details-content">
-            <img src={"http://localhost:3000/" + data.image} alt="" />
+            <img src={"http://localhost:3000/" + event.image} alt="" />
             <div id="event-details-info">
               <div>
-                <p id="event-details-location">{data.location}</p>
+                <p id="event-details-location">{event.location}</p>
                 <time dateTime={`Todo-DateT$Todo-Time`}>
                   {formattedDateString}
                 </time>
               </div>
-              <p id="event-details-description">{data.description}</p>
+              <p id="event-details-description">{event.description}</p>
             </div>
           </div>
         </article>
