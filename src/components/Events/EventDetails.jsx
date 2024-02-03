@@ -5,9 +5,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { deleteEvent, fetchEvent, queryClient } from "../utils/http.js";
 import ErrorBlock from "../UI/ErrorBlock.jsx";
 import LoadingIndicator from "../UI/LoadingIndicator.jsx";
+import Modal from "../UI/Modal.jsx";
+import { useState } from "react";
 
 export default function EventDetails() {
   const navigate = useNavigate();
+  const [isDeleting, setisDeleting] = useState(false);
   const params = useParams();
   const {
     data: event,
@@ -19,12 +22,19 @@ export default function EventDetails() {
     queryFn: ({ signal }) => fetchEvent({ id: params.id, signal }),
   });
 
-  const { mutate, isPending: deleting } = useMutation({
+  const {
+    mutate,
+    isPending: deleting,
+    error: delError,
+  } = useMutation({
     // mutationKey: ["delete-event"],
     mutationFn: deleteEvent,
     onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["events"],
+        refetchType: "none",
+      });
       navigate("/events");
-      queryClient.invalidateQueries({ queryKey: ["events"] });
     },
   });
 
@@ -32,8 +42,40 @@ export default function EventDetails() {
   const dateObject = new Date(dateString);
   const formattedDateString = dateObject.toDateString();
 
+  const startDeletion = () => {
+    setisDeleting(true);
+  };
+
+  const cancelDeletion = () => {
+    setisDeleting(false);
+  };
+
+  const handleDeleteEvent = () => {
+    mutate({ id: params.id });
+  };
+
   return (
     <>
+      {isDeleting && (
+        <Modal onClose={cancelDeletion}>
+          <h2>Are You Sure?</h2>
+          <p>Are you really want to delete this event?</p>
+          <div className="form-actions">
+            <button className="button-text" onClick={cancelDeletion}>
+              Cancel
+            </button>
+            <button className="button" onClick={handleDeleteEvent}>
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+          {delError && (
+            <ErrorBlock
+              title={"Failed to delete"}
+              message={delError.info?.message || "Please Try again!"}
+            />
+          )}
+        </Modal>
+      )}
       <Outlet />
       <Header>
         <Link to="/events" className="nav-item">
@@ -58,9 +100,7 @@ export default function EventDetails() {
           <header>
             <h1>{event.title}</h1>
             <nav>
-              <button onClick={() => mutate({ id: params.id })}>
-                {deleting ? "Deleting..." : "Delete"}
-              </button>
+              <button onClick={startDeletion}>Delete</button>
               <Link to="edit">Edit</Link>
             </nav>
           </header>
